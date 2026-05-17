@@ -12,6 +12,10 @@ on:
         required: false
         type: boolean
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build uxplay
@@ -67,21 +71,29 @@ jobs:
           cd ..
           Remove-Item -Recurse -Force mdns2881
 
-      - name: cache msys2 pacman packages
-        uses: actions/cache@v5
-        with:
-          path: |
-            C:\msys64\var\cache\pacman\pkg
-            C:\msys64\var\lib\pacman\sync
-          key: msys2-pacman-${{ runner.os }}-${{ hashFiles('ucrt_x64_dependencies.txt') }}-v2
-          restore-keys: |
-            msys2-pacman-${{ runner.os }}-
-
-      - name: download+install msys2
+      - name: setup msys2 and build packages
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: false
+          release: false
+          cache: true
+          install: >-
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libplist
+            mingw-w64-ucrt-x86_64-json-glib
+            mingw-w64-ucrt-x86_64-gstreamer
+            mingw-w64-ucrt-x86_64-gst-plugins-base
+            mingw-w64-ucrt-x86_64-gst-libav
+            mingw-w64-ucrt-x86_64-gst-plugins-good
+            mingw-w64-ucrt-x86_64-gst-plugins-bad
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-python-psutil
+            mingw-w64-ucrt-x86_64-python-pip
+            mingw-w64-ucrt-x86_64-pyinstaller
 
       - name: cache pip and python packages
         uses: actions/cache@v5
@@ -93,13 +105,11 @@ jobs:
           restore-keys: |
             pip-winrt-${{ runner.os }}-
 
-      - name: install build dependencies
+      - name: install python winrt packages
         shell: msys2 {0}
         run: |
           export PIP_CACHE_DIR="${PWD}/pip-cache"
           mkdir -p "$PIP_CACHE_DIR"
-
-          pacman -S --needed --noconfirm - < ucrt_x64_dependencies.txt
 
           if ! python -c "import winrt.windows.foundation" 2>/dev/null; then
             pip install \
